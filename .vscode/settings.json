@@ -1,0 +1,16 @@
+{
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "clangd.arguments": [
+        "--background-index",
+        "--compile-commands-dir=${workspaceFolder}",
+        "--clang-tidy",
+        "--header-insertion=never"
+    ],
+    "files.watcherExclude": {
+        "**/.pio/**": true
+    },
+    "json.schemas": [],
+    "files.associations": {
+        ".clangd": "yaml"
+    }
+}

@@ -1,0 +1,32 @@
+# 1. Completely silence all errors and warnings in .pio, .platformio, and external packages
+---
+If:
+  PathMatch:
+    - .*\.pio/.*
+    - .*\.platformio/.*
+    - .*/libdeps/.*
+CompileFlags:
+  Add:
+    - -w
+Diagnostics:
+  Suppress: "*"
+  UnusedIncludes: None
+---
+
+# 2. Global fallback flags applied to ALL files (including headers with no compile entry)
+#    Ensures headers like EngineDriver.h can resolve ESP32Encoder.h even without a compile db entry.
+CompileFlags:
+  Add:
+    - -I.pio/libdeps/ttgo-t7-v13-mini32/ESP32Encoder/src
+    - -I.pio/libdeps/ttgo-t7-v13-mini32/VL53L0X
+    - -I.pio/libdeps/ttgo-t7-v13-mini32/nlohmann-json/single_include
+    - -DESP_PLATFORM
+    - -DESP32
+    - -DARDUINO_ARCH_ESP32
+    - -DARDUINO=10812
+  CompilationDatabase: .
+Diagnostics:
+  Suppress:
+    - pp_file_not_found
+    - drv_unknown_argument
+  UnusedIncludes: None
