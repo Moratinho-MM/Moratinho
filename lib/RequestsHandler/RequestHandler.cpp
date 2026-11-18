@@ -1,8 +1,10 @@
 #include "RequestsHandler.h"
+#include "../BluetoothHandler/BluetoothHandler.h"
 
-using namespace RequestHandler;
-
-void ParseRequest(char* request)
-{
-    
-} 
+namespace RequestHandler {
+    void ParseRequest(char* request) {
+        if (request != nullptr) {
+            BluetoothHandler::handleIncomingJson(std::string(request));
+        }
+    }
+}

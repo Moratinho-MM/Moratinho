@@ -1,6 +1,5 @@
 #include "MPU6050_Goytacaz.h"
 
-
 void IMU::begin()
 {
     dmpReady = false;
@@ -8,73 +7,88 @@ void IMU::begin()
 }
 
 void IMU::IMU_CONFIG() {
-
-    // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
         Wire.begin();
-        Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having
-                               // compilation difficulties
+        Wire.setClock(400000); // 400kHz I2C clock
     #endif
 
     IMU_BOOT();
 }
 
+float IMU::readRawGyroZDps()
+{
+    int16_t rawGz = mpu.getRotationZ();
+    // Negated to match ypr[0] yaw sign convention (+yaw = increasing angle)
+    return -(static_cast<float>(rawGz) / gyroScaleLsbPerDps);
+}
+
+void IMU::calibrateGyroBias(uint16_t samples)
+{
+    // Keep robot completely still for ~500 ms after power-on and average 500 Z-axis samples
+    double sum = 0.0;
+    for (uint16_t i = 0; i < samples; ++i) {
+        sum += static_cast<double>(readRawGyroZDps());
+        delay(1);
+    }
+    gyroZBiasDps = static_cast<float>(sum / static_cast<double>(samples));
+}
+
 void IMU::IMU_BOOT() {
-    // initialize device
     const char* emitter = "MPU6050_Goytacaz";
     
     ErrorHandler::throwWarning("Initializing IMU, pease wait...", emitter);
     mpu.initialize();
-    // verify connection
 
     bool mpuSuccess = mpu.testConnection();
-
     mpuSuccess ? ErrorHandler::throwWarning("IMU initialization successfull.", emitter) :
-    ErrorHandler::throwError("IMU initialization failed.", emitter);
+                 ErrorHandler::throwError("IMU initialization failed.", emitter);
     
-    // load and configure the DMP
+    // Load and configure the DMP
     devStatus = mpu.dmpInitialize();
-    // supply your own gyro offsets here, scaled for min sensitivity
+
+    // Supply baseline gyro/accel offsets
     mpu.setXGyroOffset(3.00000);
     mpu.setYGyroOffset(-60.00000);
     mpu.setZGyroOffset(12.00000);
     mpu.setZAccelOffset(896.00000); 
-    // 1688 factory default for my test chip
-    // make sure it worked (returns 0 if so)
 
     if (devStatus == 0) {
-        // Calibration Time: generate offsets and calibrate our MPU6050
         mpu.CalibrateAccel(6);
         mpu.CalibrateGyro(6);
-        // mpu.PrintActiveOffsets();
-        //  turn on the DMP, now that it's ready
-        // Serial.println(F("Enabling DMP..."));
         mpu.setDMPEnabled(true);
-        // mpuIntStatus = mpu.getIntStatus();
 
         dmpReady = true;
-
-        // get expected DMP packet size for later comparison
         packetSize = mpu.dmpGetFIFOPacketSize();
+    } else {
+        ErrorHandler::throwError("Failed to configure DMP.", emitter);
     }
 
-    else ErrorHandler::throwError("Failed to configure DMP.", emitter);
+    // Determine active gyro full-scale sensitivity after DMP/IMU setup
+    switch (mpu.getFullScaleGyroRange()) {
+        case MPU6050_GYRO_FS_250:  gyroScaleLsbPerDps = 131.0f; break;
+        case MPU6050_GYRO_FS_500:  gyroScaleLsbPerDps = 65.5f;  break;
+        case MPU6050_GYRO_FS_1000: gyroScaleLsbPerDps = 32.8f;  break;
+        case MPU6050_GYRO_FS_2000:
+        default:                   gyroScaleLsbPerDps = 16.4f;  break;
+    }
+
+    // 500 ms stationary bias calibration
+    calibrateGyroBias(500);
 }
 
 void IMU::IMU_READ() {
-    // if programming failed, don't try to do anything
+    // Update bias-corrected Z-axis angular velocity every tick (zero phase lag for PD derivative)
+    gyroZDps = readRawGyroZDps() - gyroZBiasDps;
+
     if (!dmpReady) return;
-    // read a packet from FIFO
-    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet
 
+    // Read latest packet from DMP FIFO if available
+    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
         #ifdef OUTPUT_READABLE_YAWPITCHROLL
-
         mpu.dmpGetQuaternion(&q, fifoBuffer);
         mpu.dmpGetGravity(&gravity, &q);
         mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-        // Serial.print("yaw:");
-        yaw = ypr[0] * 180 / M_PI;
-
+        yaw = wrap180(ypr[0] * 180.0f / M_PI);
         #endif
     }
 }
@@ -82,4 +96,16 @@ void IMU::IMU_READ() {
 float IMU::getYaw() const
 {
     return yaw;
+}
+
+float IMU::getGyroZ() const
+{
+    return gyroZDps;
+}
+
+float IMU::wrap180(float angle)
+{
+    while (angle > 180.0f)  angle -= 360.0f;
+    while (angle <= -180.0f) angle += 360.0f;
+    return angle;
 }

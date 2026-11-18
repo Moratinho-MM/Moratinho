@@ -1,5 +1,5 @@
 #include "Coordinates.h"
-#include <stdexcept>
+#include "../ErrorHandler/ErrorHandler.h"
 
 char translateToAPI(directions dir) {
     char apiDirections[] = {'n', 's', 'e', 'w'};
@@ -37,7 +37,7 @@ directions opositeSide(directions dir)
     case EAST: return WEST;
     case WEST: return EAST;
     
-    default: throw std::invalid_argument("Invalid direction was given!"); // TODO : adicionar error handler de forma adequada
+    default: ErrorHandler::throwError("Invalid direction was given!", "Coordinates.cpp");
     }
 }
 
@@ -48,7 +48,7 @@ directions leftSide(directions dir) {
         case SOUTH: return EAST;
         case EAST: return NORTH;
         case WEST: return SOUTH;
-        default: throw std::invalid_argument("Invalid direction was given!");
+        default: ErrorHandler::throwError("Invalid direction was given!", "Coordinates.cpp");
     }
 }
 
@@ -59,6 +59,6 @@ directions rightSide(directions dir) {
         case SOUTH: return WEST;
         case EAST: return SOUTH;
         case WEST: return NORTH;
-        default: throw std::invalid_argument("Invalid direction was given!");
+        default: ErrorHandler::throwError("Invalid direction was given!", "Coordinates.cpp");
     }
 }

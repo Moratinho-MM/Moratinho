@@ -68,6 +68,8 @@ void Orientation::turnFromAtoB(directions beggining, directions end)
         case EAST: turn180degrees(); break;
         default: break;
         } break;
+    default:
+        break;
     }
     
 }

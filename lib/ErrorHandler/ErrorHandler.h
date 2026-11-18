@@ -1,7 +1,5 @@
 #pragma once
 
-#include "BluetoothHandler.h"
-
 class ErrorHandler {
     public:
 

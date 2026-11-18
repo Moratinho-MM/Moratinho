@@ -5,8 +5,12 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 #include <Arduino.h>
+
 #include <atomic>
 #include "../ConstantConfigs.h"
+
+class MovController;
+class IRSensors;
 
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
@@ -14,6 +18,18 @@
 
 namespace BluetoothHandler 
 {
+    enum class PendingCommand {
+        NONE,
+        STOP,
+        MOVE_CELL,
+        MOVE_CELLS,
+        MOVE_FORWARD_INDETERMINATE,
+        TURN_DEG,
+        TURN_RIGHT,
+        TURN_LEFT,
+        TURN_180
+    };
+
     typedef enum {
         MSG,
         FATAL_ERROR,
@@ -68,6 +84,13 @@ namespace BluetoothHandler
     };
 
     BLEServer* setUpBluetoothServer();
+
+    void init(MovController* controller, IRSensors* irSensors);
+    void handleIncomingJson(const std::string& rxValue);
+    void processPendingCommands();
+    void notifyCurrentParams();
+    bool isIndeterminateMoving();
+    bool checkAndClearStartRequest();
 
     void notifyClient(const String& msg);
     String formatTxMsg(const char* msg, MessageTypes type);

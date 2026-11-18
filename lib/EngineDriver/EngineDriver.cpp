@@ -13,9 +13,10 @@ bool EngineDriver::setUpEngine(uint8_t front_pin, uint8_t back_pin,uint8_t pwm_p
     //** configuracao_PWM ** 
     if (!ledcSetup(pwm_channel, freq, resolution))
         return false;
-    else return true;
     
     ledcAttachPin(pwm_pin, pwm_channel);
+    
+    return true;
 }
 
 bool EngineDriver::setupEncoder(int aPin, int bPin)
@@ -51,6 +52,13 @@ void EngineDriver::turnOff()
     digitalWrite(pin_back_engine,0);   
 }
 
+void EngineDriver::brake()
+{
+    digitalWrite(pin_front_engine, 1);
+    digitalWrite(pin_back_engine, 1);
+    ledcWrite(pwm_channel, 255);
+}
+
 bool EngineDriver::isEncoderSetUp()
 {
     return encoderSetUp;
@@ -63,3 +71,12 @@ EngineDriver::~EngineDriver()
     ledcDetachPin(pwm_pin);
 }
 
+int EngineDriver::getEncoderMeasure()
+{
+    return encoder.getCount();
+}
+
+void EngineDriver::resetEncoderMeasure()
+{
+    encoder.clearCount();
+}

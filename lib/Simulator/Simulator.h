@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include "BluetoothHandler.h"
 
 class SIMULATOR {
 

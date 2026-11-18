@@ -26,6 +26,9 @@ class EngineDriver {
     bool setupEncoder(int aPin, int bPin);
     void turnOn(int16_t vel);
     void turnOff();
+    void brake();
+    int getEncoderMeasure();
+    void resetEncoderMeasure();
 
     bool isEncoderSetUp();
 

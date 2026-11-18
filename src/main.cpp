@@ -23,6 +23,7 @@ void setup()
     while (!Serial && (millis() - timeout_start < 1000));
     Serial.println("No bluetooth set : Serial connection has started.");
     #endif
+    
 
     irSensors.begin(
         XSHUT_F,
@@ -56,6 +57,10 @@ void setup()
     rightEngine.setupEncoder(RIGHT_ENCODER_A_PIN, RIGHT_ENCODER_B_PIN);
 
     controller.begin(&irSensors, &giroscope, &leftEngine, &rightEngine);
+
+    #if defined(BLUETOOTH_ENABLE) && !defined(SIMULATION)
+    BluetoothHandler::init(&controller, &irSensors);
+    #endif
 }
 
 #ifdef SIMULATION
@@ -127,110 +132,128 @@ directions nextStep()
         ErrorHandler::throwError("Tried to access an out of boundary cell.", "nextStep, main.cpp");
         return controller.getFrontDir();
     }
+    directions front = controller.getFrontDir();
 
     currentCell->setExplored(true);
 
-    // Tenta rodar o algorítmo duas vezes, caso entre em um beco sem saída.
-    // Se mesmo assim não achar saída, é pq o robô está preso, o labirinto é impossível.
-    for (int attempt = 0; attempt < 2; attempt++)
+    unsigned short smallestDistance = currentCell->getDistance();
+    directions movDir = INVALID_DIRECTION;
+
+    for (directions dir : allDirections)
     {
-        unsigned short smallestDistance = currentCell->getDistance();
-        directions movDir = controller.getFrontDir();
-        bool foundBetterPath = false;
-
-        for (directions dir : allDirections)
+        if (!currentCell->peekWall(dir))
         {
-            if (!currentCell->peekWall(dir))
-            {
-                short dx = posX + offsetX(dir);
-                short dy = posY + offsetY(dir);
+            short dx = posX + offsetX(dir);
+            short dy = posY + offsetY(dir);
 
-                Cell* neighbor = maze.getCell(dx, dy);
-                if (neighbor != nullptr)
-                {
-                    unsigned short nextDistance = neighbor->getDistance();
-                    if (nextDistance < smallestDistance)
-                    {
-                        smallestDistance = nextDistance;
-                        movDir = dir;
-                        foundBetterPath = true;
-                    }
+            Cell* neighbor = maze.getCell(dx, dy);
+
+            if (neighbor) {
+              unsigned short d = neighbor->getDistance();
+              if (d < currentCell->getDistance()) {
+                if (d < smallestDistance ||
+                    (d == smallestDistance && dir == front)) {
+                  smallestDistance = d;
+                  movDir = dir;
                 }
+              }
             }
         }
-
-        if (foundBetterPath)
-        {
-            return movDir;
-        }
-
-        readEnviroment();
-        maze.updateDistances();
     }
 
-    ErrorHandler::throwWarning("No open path to goal found!", "nextStep, main.cpp");
-    return controller.getFrontDir();
-}
-void doNextMove()
-{
-    
-    directions movDir = nextStep();  
-
-    directions currentDir = controller.getFrontDir();
-    controller.turnFromAtoB(currentDir, movDir);
-
-    controller.moveCell();
-
+    return movDir;
 }
 
-bool start = false;
-void loop()
-{
-    while (!start) 
-    {
-        if (irSensors.getFrontDistance() < 5)
-        {
-            start = true;
-            giroscope.IMU_CONFIG(); // Adicionei isto aqui para calibrar o robô depois de perfeitamente posicionado
+enum RobotState {
+    WAIT_FOR_START,
+    EXPLORING,
+    GOAL_REACHED,
+    ERROR_STOP
+};
+
+RobotState state = WAIT_FOR_START;
+
+void loop() {
+    #if defined(BLUETOOTH_ENABLE) && !defined(SIMULATION)
+    BluetoothHandler::processPendingCommands();
+    #endif
+
+    switch (state) {
+        case WAIT_FOR_START: {
+            #if defined(BLUETOOTH_ENABLE) && !defined(SIMULATION)
+            if (BluetoothHandler::isIndeterminateMoving()) {
+                break;
+            }
+            if (BluetoothHandler::checkAndClearStartRequest()) {
+                state = EXPLORING;
+                break;
+            }
+            #endif
+
+            // Trigger start when hand is placed within 5cm of front sensor
+            if (irSensors.getFrontDistance() > 0.5f && irSensors.getFrontDistance() < 5.0f) {
+                delay(1000); // Give user 1s to remove hand
+                state = EXPLORING;
+            }
             delay(50);
             break;
         }
-        delay(200);
-    }
 
-    giroscope.IMU_READ();
-    if (!(controller.getPosX() == maze.getGoalX() && controller.getPosY() == maze.getGoalY()))
-    {
-        readEnviroment();
-        maze.updateDistances();
-        doNextMove();
-    }
-    
-    #pragma region bluetoothControll
-    #ifdef BLUETOOTH_ENABLE
-    #ifndef SIMULATION
-    if (BluetoothHandler::ServerState::getConnectionState())
-    {
-        if (BluetoothHandler::timeOut())
-        {
-            // Monta uma mensagem contínua (ex: tempo desde que o ESP ligou)
-            giroscope.IMU_READ();
+        case EXPLORING: {
+            short x = controller.getPosX();
+            short y = controller.getPosY();
 
-            float yaw = giroscope.getYaw();
+            // Check for 2x2 Micromouse center (for 16x16: x in [7,8], y in [7,8])
+            if ((x == 7 || x == 8) && (y == 7 || y == 8)) {
+                controller.stop();
+                state = GOAL_REACHED;
+                break;
+            }
 
-            float distances[3] = {
-                irSensors.getFrontDistance(),
-                irSensors.getRightDistance(),
-                irSensors.getLeftDistance()
-            };
+            // 1. Sense walls at current cell
+            readEnviroment();
 
-            String txValue = BluetoothHandler::formatSensorDataMsg(distances, yaw);
+            // 2. Recalculate floodfill distances
+            maze.updateDistances();
 
-            // Envia a notificação para o Python
-            BluetoothHandler::notifyClient(txValue);
+            // 3. Determine best neighbor and execute movement
+            directions movDir = nextStep();
+            if (movDir == INVALID_DIRECTION) {
+                controller.stop();
+                state = ERROR_STOP;
+                ErrorHandler::throwError("Messed up direction. Impossible to solve!", "main.cpp");
+                break;
+            }
+
+            directions currentDir = controller.getFrontDir();
+            controller.turnFromAtoB(currentDir, movDir);
+            controller.moveCell();
+            break;
+        }
+
+        case GOAL_REACHED: {
+            controller.stop();
+            // Voltar pro inicio ?
+            delay(500);
+            break;
+        }
+
+        case ERROR_STOP: {
+            controller.stop();
+            delay(1000);
+            break;
         }
     }
-    #pragma endregion
-    #endif
+
+    #if defined(BLUETOOTH_ENABLE) && !defined(SIMULATION)
+    if (BluetoothHandler::ServerState::getConnectionState() && BluetoothHandler::timeOut()) {
+        float distances[3] = {
+            irSensors.getFrontDistance(),
+            irSensors.getRightDistance(),
+            irSensors.getLeftDistance()
+        };
+        String txValue = BluetoothHandler::formatSensorDataMsg(distances, giroscope.getYaw());
+        BluetoothHandler::notifyClient(txValue);
+    }
     #endif
 }

@@ -5,7 +5,8 @@ typedef enum directions
     NORTH,
     SOUTH,
     EAST,
-    WEST
+    WEST,
+    INVALID_DIRECTION
 } directions;
 
 extern const directions allDirections[4];

@@ -1,8 +1,7 @@
 #pragma once
 
-#include <queue>
-#include <vector>
 #include "Coordinates.h"
+#include "../ErrorHandler/ErrorHandler.h"
 
 #include <Arduino.h>
 
@@ -63,6 +62,8 @@ class Cell
     bool explored;
     
     public:
+    Cell() = default;
+
     Cell(short x, short y)
     {
         pos_x = x; pos_Y = y;
@@ -96,6 +97,11 @@ class Cell
     }
 };
 
+// Estrutura leve para armazenar as coordenadas na stack
+struct Coord {
+    short x;
+    short y;
+};
 
 class Maze 
 {
@@ -103,7 +109,8 @@ class Maze
     short goalX, goalY;
     unsigned short size;
 
-    std::vector<std::vector<Cell>> grid;
+    Cell grid[MAX_MAZE_SIZE][MAX_MAZE_SIZE];
+    Coord queue[MAX_MAZE_SIZE * MAX_MAZE_SIZE];
 
     public:
     
@@ -120,19 +127,21 @@ class Maze
 
     void generateMaze()
     {
-        grid.clear();
-        // Iniclia as linhas
-        
-        // Calcula distâncias desconsiderando as paredes
+        // Não há necessidade de clear() ou push_back(), apenas sobrescrevemos as células ativas
         for (short y = 0; y < size; y++)
         {
-            std::vector<Cell> gridLine;
             for (short x = 0; x < size; x++)
             {
-                gridLine.push_back(Cell(x, y));
+                grid[y][x] = Cell(x, y);
+                if (x == 0)        grid[y][x].activateWall(WEST);
+                if (x == size - 1) grid[y][x].activateWall(EAST);
+                if (y == 0)        grid[y][x].activateWall(SOUTH);
+                if (y == size - 1) grid[y][x].activateWall(NORTH);
             }
-            grid.push_back(gridLine);
         }
+
+        grid[0][0].activateWall(EAST);
+        grid[0][1].activateWall(WEST);
         updateDistances();
     }
 
@@ -147,49 +156,56 @@ class Maze
         }
     }
 
-    void updateDistances()
-    {
-        resetCellDistances();
-        
-        std::queue<std::pair<short, short>> q;
+    void updateDistances() {
+      resetCellDistances();
+      
+      int head = 0; // Índice de leitura (front/pop)
+      int tail = 0; // Índice de escrita (push)
 
-        bool visited[MAX_MAZE_SIZE][MAX_MAZE_SIZE] = {false};
+      bool visited[MAX_MAZE_SIZE][MAX_MAZE_SIZE] = {false};
 
-        // Inicializa a célula objetivo
-        Cell* goalCell = getCell(goalX, goalY);
-        if (!goalCell) return;                                      // TODO : Redirecionar erro para o ErrorHandler
-        goalCell->setDistance(0);
-        
-        q.push({goalX, goalY});
-        visited[goalY][goalX] = true;
+      // Inicializa a célula objetivo
+      Cell *goalCell = getCell(goalX, goalY);
+      if (!goalCell)
+        ErrorHandler::throwError("Could not star a goal cell",
+                                 "Maze: updateDistances");
 
-        while (!q.empty())
-        {
-            auto coords = q.front();
-            short x = coords.first;
-            short y = coords.second;
-            q.pop();
-
-            unsigned short currentDistance = getCell(x, y)->getDistance();
-
-            // Explorar vizinhos
-            for (directions dir : allDirections) 
-            {
-                short dx = x + offsetX(dir);
-                short dy = y + offsetY(dir);
-
-                // Verificar limites e paredes
-                if (0 <= dx && dx < size && 0 <= dy && dy < size &&
-                    !getCell(x, y)->peekWall(dir) && // Sem parede nessa direção
-                    visited[dy][dx] == false) // Não visitado 
-                {
-
-                    getCell(dx, dy)->setDistance(currentDistance + 1);
-                    q.push({dx, dy});
-                    visited[dy][dx] = true;
-                }
-            }
+      short goals[4][2] = {{7, 7}, {7, 8}, {8, 7}, {8, 8}};
+      for (auto &g : goals) {
+        Cell *c = getCell(g[0], g[1]);
+        if (c) {
+          c->setDistance(0);
+          queue[tail++] = {g[0], g[1]};
+          visited[g[1]][g[0]] = true;
         }
+      }
+
+      visited[goalY][goalX] = true;
+
+      // Equivalente a while (!q.empty())
+      while (head < tail) {
+        // Equivalente a q.front() + q.pop()
+        Coord current = queue[head++];
+        short x = current.x;
+        short y = current.y;
+
+        Cell *currentCell = getCell(x, y);
+        unsigned short currentDistance = currentCell->getDistance();
+
+        // Explorar vizinhos
+        for (directions dir : allDirections) {
+          short dx = x + offsetX(dir);
+          short dy = y + offsetY(dir);
+
+          // Verificar limites, paredes e se já foi visitado
+          if (0 <= dx && dx < size && 0 <= dy && dy < size &&
+              !currentCell->peekWall(dir) && !visited[dy][dx]) {
+            getCell(dx, dy)->setDistance(currentDistance + 1);
+            queue[tail++] = {dx, dy}; // push
+            visited[dy][dx] = true;
+          }
+        }
+      }
     }
 
     std::pair<short, short> getGoal()
@@ -221,7 +237,7 @@ class Maze
     {
         Cell *c = getCell(x, y);
         if (c) c->activateWall(dir);
-        else return;                                                // TODO : Redirecionar erro para o ErrorHandler
+        else ErrorHandler::throwError("Tried to access out of boudry cell", "Maze: activateCellWalls");                                                // TODO : Redirecionar erro para o ErrorHandler
         
         short dx = x + offsetX(dir);
         short dy = y + offsetY(dir);
@@ -231,7 +247,8 @@ class Maze
             Cell *nc = getCell(dx, dy);
             if (nc)
                 nc->activateWall(opositeSide(dir));
-            else return;                                            // TODO : Redirecionar erro para o ErrorHandler
+            else ErrorHandler::throwError("No oposite side for this cell", "Maze: activateCellWalls");                                                // TODO : Redirecionar erro para o ErrorHandler
+;                                            
         }
     }
 
