@@ -4,9 +4,9 @@
 bool MovController::begin(IRSensors* ir, IMU* imu, EngineDriver* leftEngine, EngineDriver* rightEngine)
 {
     // Inner gyro PD gains (Ki = 0) and outer wall P gain
-    float kp = 2.2f, ki = 0.0f, kd = 0.08f;
+    float kp = 1, ki = 0.0f, kd = 0;
     pid.setParameters(kp, ki, kd);
-    pid.setWallKp(0.12f);
+    pid.setWallKp(1);
     pid.resetGating();
     
     this->ir = ir;

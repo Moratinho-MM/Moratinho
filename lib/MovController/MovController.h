@@ -29,18 +29,18 @@ class MovController {
     pidController pid;
     float setPoint = 0.0f;     // Cell heading theta_cell in [-180, 180] deg
     float target_yaw = 0.0f;   // Combined target heading wrap180(theta_cell + theta_wall)
-    int bias = 40;
+    int bias = 90;
 
     // Lateral wall thresholds (mm) for 180 mm cell (~168 mm inner wall-to-wall gap)
     static constexpr float kWallPresentMaxMm   = 110.0f;
-    static constexpr float kCenterTargetMm     = 84.0f;
+    static constexpr float kCenterTargetMm     = 93.0f;
     static constexpr float kMaxStepDeltaMm     = 15.0f;
     static constexpr float kMaxWallAngleDeg    = 12.0f;
 
     // Front VL53L0X longitudinal thresholds (mm)
     static constexpr float kFrontTurnTriggerMm = 85.0f;
-    static constexpr float kFrontStopMm        = 25.0f;
-    static constexpr float kIdealFrontStopMm   = 42.0f;
+    static constexpr float kFrontStopMm        = 42.0f;
+    static constexpr float kIdealFrontStopMm   = 65.0f;
 
     const float WALL_TRESHOLD = 15.0f;     // cm compatibility threshold
     const float WALL_KEEP_DISTANCE = 9.0f; // cm compatibility distance
@@ -51,7 +51,7 @@ class MovController {
     int motor_e_offset = 1;
 
     float angle_offset = 6.0f; // Tightened stopping window for wrapped gyro turns
-    float turnBias     = 50;
+    float turnBias     = 35;
 
     /* Engine speed variables */
     int motor_left_speed = 0;

@@ -18,11 +18,24 @@ static std::atomic<bool> s_indeterminateMoving{false};
 static std::atomic<bool> s_startRequested{false};
 bool BluetoothHandler::ServerState::getConnectionState() { return deviceConnected; }
 
-
 void BluetoothHandler::ServerState::setConnectionState(bool state) { deviceConnected = state; }
 void BluetoothHandler::ServerState::setServer(BLEServer *server) { pServer = server; }
 void BluetoothHandler::ServerState::setCharacteristic(BLECharacteristic* characteristic){ pCharacteristic = characteristic; }
 BLEServer *BluetoothHandler::ServerState::getServer() { return pServer; }
+
+static bool recivedResponse = false;
+static bool lastResponse = false;
+
+bool BluetoothHandler::getLastResponse()
+{
+    recivedResponse = false;
+    return lastResponse;
+}
+bool BluetoothHandler::hasRecivedRespone()
+{
+    return recivedResponse;
+}
+
 
 BLECharacteristic *BluetoothHandler::ServerState::getBluetoothCharacteristics() 
 {
@@ -75,7 +88,7 @@ void BluetoothHandler::notifyCurrentParams()
     std::snprintf(
         buffer,
         sizeof(buffer),
-        "kp:%.3f, ki:%.3f, kd:%.3f,wall_kp:%.3f,bias:%d, turn_bias:%.1f,offset_l:%d,offset_f:%d,offset_r:%d,angle_offset:%.1f,motor_d:%d,motor_e:%d",
+        "kp:%.3f, ki:%.3f, kd:%.3f,wall_kp:%.3f,bias:%d,turn_bias:%.1f,offset_l:%d,offset_f:%d,offset_r:%d,angle_offset:%.1f,motor_d:%d,motor_e:%d",
         s_pController->getKp(),
         s_pController->getKi(),
         s_pController->getKd(),
@@ -258,6 +271,13 @@ void BluetoothHandler::handleIncomingJson(const std::string& rxValue)
         else {
             notifyClient(formatTxMsg("status : error,msg : unknown_command", WARNING));
         }
+    }
+
+    if (j.contains("res")) {
+        bool res = j["res"].get<bool>();
+
+        lastResponse = res;
+        recivedResponse = true;
     }
 }
 

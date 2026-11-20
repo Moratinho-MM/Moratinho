@@ -248,12 +248,23 @@ void loop() {
     #if defined(BLUETOOTH_ENABLE) && !defined(SIMULATION)
     if (BluetoothHandler::ServerState::getConnectionState() && BluetoothHandler::timeOut()) {
         float distances[3] = {
-            irSensors.getFrontDistance(),
-            irSensors.getRightDistance(),
-            irSensors.getLeftDistance()
+            irSensors.getFrontDistanceMm(),
+            irSensors.getRightDistanceMm(),
+            irSensors.getLeftDistanceMm()
         };
         String txValue = BluetoothHandler::formatSensorDataMsg(distances, giroscope.getYaw());
         BluetoothHandler::notifyClient(txValue);
     }
+    # ifdef TUNE_WALL_DISTANCE
+    char buffer[50]; 
+
+    std::snprintf(
+        buffer, 
+        sizeof(buffer), 
+        "WALL L : %d | WALL F : %d | WALL R %d",
+        hasWalLleft(), hasWallFront(), hasWallRight()
+    );
+    BluetoothHandler::notifyClient(BluetoothHandler::formatTxMsg(buffer, BluetoothHandler::TOP_MSG));
+    #endif
     #endif
 }

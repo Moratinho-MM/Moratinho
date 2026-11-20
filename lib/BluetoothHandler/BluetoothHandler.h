@@ -27,7 +27,7 @@ namespace BluetoothHandler
         TURN_DEG,
         TURN_RIGHT,
         TURN_LEFT,
-        TURN_180
+        TURN_180,
     };
 
     typedef enum {
@@ -45,6 +45,7 @@ namespace BluetoothHandler
         TURN_L_REQ,
         SET_CELL_D_REQ,
         CLEAR_CELL_D_REQ,
+        TOP_MSG
     } MessageTypes;
 
 
@@ -95,6 +96,9 @@ namespace BluetoothHandler
     void notifyClient(const String& msg);
     String formatTxMsg(const char* msg, MessageTypes type);
     String formatSensorDataMsg(float distanceData[3], float yaw);
+
+    bool hasRecivedRespone();
+    bool getLastResponse();
 
     bool timeOut();
 }

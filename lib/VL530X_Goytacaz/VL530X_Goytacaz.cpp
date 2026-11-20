@@ -119,7 +119,7 @@ float IRSensors::getFrontDistance()
 
 float IRSensors::getLeftDistance() 
 {
-    return readFilteredDistance(leftIfs, lastLeftDist, leftOffsetMm, leftUpdated);
+    return readFilteredDistance(leftIfs, lastLeftDist, leftOffsetMm, leftUpdated) - 1.8;
 }
 
 float IRSensors::getRightDistanceMm()
