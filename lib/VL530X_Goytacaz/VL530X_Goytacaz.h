@@ -18,7 +18,7 @@ class IRSensors
     // Static calibration offsets in mm (measured dead-center in a 180mm cell)
     int16_t rightOffsetMm = 0;
     int16_t frontOffsetMm = 0;
-    int16_t leftOffsetMm  = 0;
+    int16_t leftOffsetMm  = 33;
 
     // Flags indicating whether a fresh non-blocking sample arrived on the latest read
     bool rightUpdated = false;

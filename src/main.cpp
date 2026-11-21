@@ -179,7 +179,7 @@ void loop() {
     #endif
 
     switch (state) {
-        case WAIT_FOR_START: {
+        /*case WAIT_FOR_START: {
             #if defined(BLUETOOTH_ENABLE) && !defined(SIMULATION)
             if (BluetoothHandler::isIndeterminateMoving()) {
                 break;
@@ -236,7 +236,7 @@ void loop() {
             // Voltar pro inicio ?
             delay(500);
             break;
-        }
+        }*/
 
         case ERROR_STOP: {
             controller.stop();
@@ -245,7 +245,7 @@ void loop() {
         }
     }
 
-    #if defined(BLUETOOTH_ENABLE) && !defined(SIMULATION)
+    #if defined(BLUETOOTH_ENABLE) && !defined(SIMULATION) && defined(SEND_TELEMETRY)
     if (BluetoothHandler::ServerState::getConnectionState() && BluetoothHandler::timeOut()) {
         float distances[3] = {
             irSensors.getFrontDistanceMm(),
@@ -256,13 +256,13 @@ void loop() {
         BluetoothHandler::notifyClient(txValue);
     }
     # ifdef TUNE_WALL_DISTANCE
-    char buffer[50]; 
+    char buffer[100]; 
 
     std::snprintf(
         buffer, 
         sizeof(buffer), 
-        "WALL L : %d | WALL F : %d | WALL R %d",
-        hasWalLleft(), hasWallFront(), hasWallRight()
+        "WALL L : %d | WALL F : %d | WALL R %d, averageDistance: %f",
+        hasWalLleft(), hasWallFront(), hasWallRight(), controller.getAverageDistance()
     );
     BluetoothHandler::notifyClient(BluetoothHandler::formatTxMsg(buffer, BluetoothHandler::TOP_MSG));
     #endif

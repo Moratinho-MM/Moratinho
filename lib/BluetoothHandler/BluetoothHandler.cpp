@@ -207,6 +207,10 @@ void BluetoothHandler::handleIncomingJson(const std::string& rxValue)
             s_pendingCmd.store(PendingCommand::TURN_RIGHT);
             notifyClient(formatTxMsg("status : queued,cmd : turn_right", MSG));
         }
+        else if (cmd == "allign_front") {
+            s_pendingCmd.store(PendingCommand::ALLIGN_FRONT);
+            notifyClient(formatTxMsg("status : queued,cmd : allign_front", MSG));
+        }
         else if (cmd == "turn_left") {
             s_pendingCmd.store(PendingCommand::TURN_LEFT);
             notifyClient(formatTxMsg("status : queued,cmd : turn_left", MSG));
@@ -268,6 +272,11 @@ void BluetoothHandler::handleIncomingJson(const std::string& rxValue)
             s_startRequested.store(true);
             notifyClient(formatTxMsg("status : ok,action : start_explore_triggered", MSG));
         }
+        else if (cmd == "reset_encoder") {
+            s_startRequested.store(true);
+            s_pendingCmd.store(PendingCommand::RESET_ENCODER);
+            notifyClient(formatTxMsg("status : ok,action : reset_encoder", MSG));
+        }
         else {
             notifyClient(formatTxMsg("status : error,msg : unknown_command", WARNING));
         }
@@ -327,15 +336,27 @@ void BluetoothHandler::processPendingCommands()
             break;
         case PendingCommand::MOVE_CELL:
             s_pController->moveCell();
-            notifyClient(formatTxMsg("status : done,cmd : move_cell", MSG));
+            notifyClient(formatTxMsg("status : done, cmd : move_cell", MSG));
+            break;
+        case PendingCommand::MOVE_FORWARD_INDETERMINATE:
+            s_pController->moveFront();
+            notifyClient(formatTxMsg("status : done, cmd : move_foward", MSG));
+            break;
+        case PendingCommand::ALLIGN_FRONT:
+            s_pController->moveFront();
+            notifyClient(formatTxMsg("status : done, cmd : allign_front", MSG));
             break;
         case PendingCommand::MOVE_CELLS: {
             s_pController->moveCells(count);
             char buffer[50];
-            std::snprintf(buffer, sizeof(buffer), "status : done,cmd : move_cells,count : %d", count);
+            std::snprintf(buffer, sizeof(buffer), "status : done, cmd : move_cells,count : %d", count);
             notifyClient(formatTxMsg(buffer, MSG));
             break;
         }
+        case PendingCommand::RESET_ENCODER:
+            s_pController->resetDistance();
+            notifyClient(formatTxMsg("status : done, cmd : reset_encoder", MSG));
+            break;
         case PendingCommand::STOP:
             s_pController->brake();
             s_pController->stop();

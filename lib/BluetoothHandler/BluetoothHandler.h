@@ -28,6 +28,8 @@ namespace BluetoothHandler
         TURN_RIGHT,
         TURN_LEFT,
         TURN_180,
+        ALLIGN_FRONT,
+        RESET_ENCODER
     };
 
     typedef enum {

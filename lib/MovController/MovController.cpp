@@ -4,9 +4,9 @@
 bool MovController::begin(IRSensors* ir, IMU* imu, EngineDriver* leftEngine, EngineDriver* rightEngine)
 {
     // Inner gyro PD gains (Ki = 0) and outer wall P gain
-    float kp = 1, ki = 0.0f, kd = 0;
+    float kp = 0.03, ki = 0.0f, kd = 0;
     pid.setParameters(kp, ki, kd);
-    pid.setWallKp(1);
+    pid.setWallKp(0.5);  // proporcional de desvio para o centro
     pid.resetGating();
     
     this->ir = ir;
@@ -47,30 +47,30 @@ unsigned long MovController::getDeltaTime()
     return dt;
 }
 
-int MovController::computeLinearBias(float averageDistCm, float dist_front_mm) const
+int MovController::computeLinearBias(float averageDistTicks, float dist_front_mm) const
 {
     // Step 1: Emergency collision cutoff
     if (dist_front_mm <= kFrontStopMm) {
         return 0;
     }
 
-    constexpr int kMinStartBias    = 48;  // Overcomes motor static friction without slipping
-    constexpr int kMinApproachBias = 42;  // Slow crawl when approaching wall or cell boundary
-    constexpr float kAccelRampCm   = 3.5f; // Accelerate over first 3.5 cm of cell
-    constexpr float kDecelRampCm   = 4.0f; // Decelerate over last 4.0 cm of cell (14.0 to 18.0 cm)
+    constexpr int kMinStartBias    = 45;  // Overcomes motor static friction without slipping  (20)
+    constexpr int kMinApproachBias = 30;  // Slow crawl when approaching wall or cell boundary (12)
+    constexpr float kAccelRampTicks   = 70; // Accelerate over first 3.5 cm of cell
+    constexpr float kDecelRampTicks   = 100; // Decelerate over last 4.0 cm of cell (14.0 to 18.0 cm)
 
     int target_bias = bias;
 
     // 1. Acceleration ramp at start of cell (prevents initial wheel spin/slip)
-    if (averageDistCm < kAccelRampCm) {
-        float ratio = averageDistCm / kAccelRampCm;
+    if (averageDistTicks < kAccelRampTicks) {
+        float ratio = averageDistTicks / kAccelRampTicks;
         ratio = pidController::clampFloat(ratio, 0.0f, 1.0f);
         target_bias = kMinStartBias + static_cast<int>(ratio * (bias - kMinStartBias));
     }
     // 2. Deceleration ramp at end of cell (prevents skid on stop)
-    else if (averageDistCm > (CELL_SIZE - kDecelRampCm)) {
-        float dist_remaining = CELL_SIZE - averageDistCm;
-        float ratio = dist_remaining / kDecelRampCm;
+    else if (averageDistTicks > (TICKS_PER_CELL - kAccelRampTicks)) {
+        float dist_remaining = TICKS_PER_CELL - averageDistTicks;
+        float ratio = dist_remaining / kDecelRampTicks;
         ratio = pidController::clampFloat(ratio, 0.0f, 1.0f);
         target_bias = kMinApproachBias + static_cast<int>(ratio * (bias - kMinApproachBias));
     }
@@ -225,7 +225,7 @@ void MovController::moveCell()
 
     float averageDistance = 0.0f;
     
-    while (averageDistance < CELL_SIZE) {
+    while (averageDistance < TICKS_PER_CELL) {
         float dist_front_mm = ir->getFrontDistanceMm();
 
         // Stop early if front sensor detects wall at ideal cell-center stop distance
@@ -243,7 +243,7 @@ void MovController::moveCell()
         // Absolute encoder counts protect against reversed-polarity encoder channels
         long leftTicks = std::labs(leftEngine->getEncoderMeasure());
         long rightTicks = std::labs(rightEngine->getEncoderMeasure());
-        averageDistance = ((leftTicks + rightTicks) / 2.0f) / TICKS_CM;
+        averageDistance = (leftTicks + rightTicks) / 2.0f;
         delay(2); // ~500 Hz control loop tick
     }
 
@@ -439,4 +439,12 @@ short MovController::getPosX() const
 short MovController::getPosY() const 
 {
     return posY;
+}
+
+float MovController::getAverageDistance(){
+    return (leftEngine->getEncoderMeasure() + rightEngine->getEncoderMeasure()) / 2.0f;
+}
+void MovController::resetDistance(){
+    leftEngine->resetEncoderMeasure();
+    rightEngine->resetEncoderMeasure();
 }

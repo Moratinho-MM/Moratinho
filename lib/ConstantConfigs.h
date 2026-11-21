@@ -26,11 +26,13 @@
 #define MAZE_SIZE  16
 #define MAZE_GOAL_X 8
 #define MAZE_GOAL_Y 8
-#define CELL_SIZE   18
+#define TICKS_PER_CELL   203   // mudar para ticks
 
 #define WALL_DETECTION_TRESHOLD 9.3 // Ajustar esse parâmetro com testes no labirinto
 #define BLUETOOTH_NAME "Moratinho_BLE"
 #define BLUETOOTH_NOTIFY_TIMER 1000
+
+#define SEND_TELEMETRY
 
 #define BLUETOOTH_ENABLE
 //#define SIMULATION
